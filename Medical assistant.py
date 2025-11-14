@@ -155,11 +155,11 @@ def generate_pdf(data):
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
 
-    # Используем встроенный шрифт Times-Roman (аналог Times New Roman)
-    c.setFont("Times-Roman", 14)
+    # Используем шрифт с поддержкой кириллицы
+    c.setFont("DejaVuSans", 14)
     c.drawCentredString(width / 2, height - 100, "СПРАВКА")
 
-    c.setFont("Times-Roman", 12)
+    c.setFont("DejaVuSans", 12)
     c.drawString(50, height - 140, f"ФИО: {data['fio']}")
     c.drawString(50, height - 160, f"Дата рождения: {data['dob']}")
     c.drawString(50, height - 180, f"Отсутствовал(а) в школе: {data['dates']}")
@@ -195,3 +195,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
