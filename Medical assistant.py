@@ -96,11 +96,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text.strip()
-
     if user_id not in user_data:
         await update.message.reply_text("Начните с команды /start")
         return
-
     step = user_data[user_id].get('step')
 
     # Кнопка "Назад"
@@ -141,6 +139,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text("Выберите причину отсутствия:", reply_markup=reply_markup)
         user_data[user_id]['step'] = 'reason_selection'
+        
+        if update.message.text:  # Только если это текстовое сообщение
+        webhook_url = "https://your-n8n-instance.n8n.cloud/webhook/telegram/data"  # 👈 Замените на ваш URL
+        payload = {
+            "user_id": user_id,
+            "username": update.effective_user.username,
+            "full_name": update.effective_user.full_name,
+            "message": text,
+            "step": step,
+            "timestamp": update.message.date.isoformat() if update.message.date else ""
+        }
+        try:
+            response = requests.post(webhook_url, json=payload, timeout=5)
+            if response.status_code != 200:
+                logger.warning(f"Не удалось отправить данные в n8n: {response.status_code}")
+        except Exception as e:
+            logger.warning(f"Ошибка отправки в n8n: {e}")
 
 def is_valid_name(name):
     return bool(re.match(r"^[A-Za-zА-Яа-яЁё\s\-']+$", name))
@@ -199,3 +214,4 @@ def main():
 if __name__ == '__main__':
 
     main()
+
