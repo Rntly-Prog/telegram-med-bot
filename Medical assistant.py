@@ -1,8 +1,13 @@
 import io
 import logging
 import os
+from dotenv import load_dotenv  # <-- Добавьте эту строку
+
+# Загружаем переменные окружения из .env файла
+load_dotenv()  # <-- Добавьте эту строку
+
 # --- Добавьте этот импорт ---
-import requests # Необходим для отправки HTTP-запросов в n8n
+import requests  # Необходим для отправки HTTP-запросов в n8n
 # -------------------------
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
@@ -24,9 +29,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-TOKEN = os.getenv('TOKEN')
+# Получение токена из переменной окружения
+TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 if not TOKEN:
-    raise ValueError("Необходимо указать токен бота в переменной окружения TOKEN")
+    raise ValueError("Не установлен токен бота. Установите переменную окружения TELEGRAM_BOT_TOKEN")
 
 # Возможные причины
 REASONS = [
@@ -40,11 +46,13 @@ REASONS = [
 # Хранилище данных пользователей
 user_data = {}
 
+
 # --- Команда /start ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("📝 Начать создание справки", callback_data='create_doc')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("Привет! Я помогу тебе создать справку для школы.", reply_markup=reply_markup)
+
 
 # --- Команда /help ---
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -59,6 +67,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(help_text, parse_mode='Markdown')
 
+
 # --- Команда /cancel ---
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -67,6 +76,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Процесс отменён.", reply_markup=ReplyKeyboardRemove())
     else:
         await update.message.reply_text("У вас нет активного процесса.")
+
 
 # --- Обработчик кнопок ---
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -84,6 +94,27 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(f"Выбрана причина: {reason}. Генерирую справку...")
         pdf_file = generate_pdf(user_data[user_id])
         await query.message.reply_document(document=pdf_file, filename="spravka.pdf")
+
+        # --- ОТПРАВКА ДАННЫХ В N8N ПОСЛЕ ГЕНЕРАЦИИ PDF ---
+        webhook_url = "https://primary-production-cee36.up.railway.app/webhook/python-telegram-bot"  # <-- ЗАМЕНИТЕ НА ВАШ РЕАЛЬНЫЙ URL из n8n
+        payload = {
+            "user_id": user_id,
+            "username": query.from_user.username,
+            "full_name": query.from_user.full_name,
+            "fio": user_data[user_id]['fio'],
+            "dob": user_data[user_id]['dob'],
+            "dates": user_data[user_id]['dates'],
+            "reason": user_data[user_id]['reason'],
+            "timestamp": query.message.date.isoformat() if query.message.date else ""
+        }
+        try:
+            response = requests.post(webhook_url, json=payload, timeout=5)
+            if response.status_code != 200:
+                logger.warning(f"Не удалось отправить данные в n8n: {response.status_code}")
+        except Exception as e:
+            logger.warning(f"Ошибка отправки в n8n: {e}")
+        # ----------------------------------------------
+
         del user_data[user_id]
     elif query.data == 'back_fio':
         user_data[user_id]['step'] = 'fio'
@@ -94,6 +125,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == 'back_dates':
         user_data[user_id]['step'] = 'dates'
         await query.edit_message_text("Укажите даты отсутствия (например, 01.11.2025 - 03.11.2025):")
+
 
 # --- Обработчик текстовых сообщений ---
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -128,7 +160,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         user_data[user_id]['dob'] = text
         reply_markup = InlineKeyboardMarkup(back_button) if back_button else None
-        await update.message.reply_text("Укажите даты отсутствия (например, 01.11.2025 - 03.11.2025):", reply_markup=reply_markup)
+        await update.message.reply_text("Укажите даты отсутствия (например, 01.11.2025 - 03.11.2025):",
+                                        reply_markup=reply_markup)
         user_data[user_id]['step'] = 'dates'
 
     elif step == 'dates':
@@ -144,33 +177,37 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_data[user_id]['step'] = 'reason_selection'
 
     if update.message.text:  # Только если это текстовое сообщение
-         webhook_url = "https://primary-production-cee36.up.railway.app/webhook/python-telegram-bot" # <-- ЗАМЕНИТЕ НА ВАШ РЕАЛЬНЫЙ URL из n8n
-         payload = {
-             "user_id": user_id,
-             "username": update.effective_user.username,
-             "full_name": update.effective_user.full_name,
-             "message": text,
-             "step": step,
-             "timestamp": update.message.date.isoformat() if update.message.date else ""
-         }
-         try:
-             response = requests.post(webhook_url, json=payload, timeout=5)
-             if response.status_code != 200:
-                 logger.warning(f"Не удалось отправить данные в n8n: {response.status_code}")
-         except Exception as e:
-             logger.warning(f"Ошибка отправки в n8n: {e}")
+        webhook_url = "https://primary-production-cee36.up.railway.app/webhook/python-telegram-bot"  # <-- ЗАМЕНИТЕ НА ВАШ РЕАЛЬНЫЙ URL из n8n
+        payload = {
+            "user_id": user_id,
+            "username": update.effective_user.username,
+            "full_name": update.effective_user.full_name,
+            "message": text,
+            "step": step,
+            "timestamp": update.message.date.isoformat() if update.message.date else ""
+        }
+        try:
+            response = requests.post(webhook_url, json=payload, timeout=5)
+            if response.status_code != 200:
+                logger.warning(f"Не удалось отправить данные в n8n: {response.status_code}")
+        except Exception as e:
+            logger.warning(f"Ошибка отправки в n8n: {e}")
+
 
 def is_valid_name(name):
     return bool(re.match(r"^[A-Za-zА-Яа-яЁё\s\-']+$", name))
 
+
 def is_valid_date(date_str):
     return bool(re.match(r"^\d{2}\.\d{2}\.\d{4}$", date_str))
+
 
 def is_valid_date_range(range_str):
     parts = range_str.split(" - ")
     if len(parts) != 2:
         return False
     return all(is_valid_date(p) for p in parts)
+
 
 def generate_pdf(data):
     buffer = io.BytesIO()
@@ -202,54 +239,6 @@ def generate_pdf(data):
     buffer.seek(0)
     return buffer
 
-# --- ИЗМЕНЁННЫЙ button_handler для отправки данных в n8n ПОСЛЕ генерации PDF ---
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    user_id = query.from_user.id
-
-    if query.data == 'create_doc':
-        user_data[user_id] = {'step': 'fio'}
-        await query.edit_message_text("Введите ФИО:")
-    elif query.data.startswith('reason_'):
-        reason = query.data.replace('reason_', '')
-        user_data[user_id]['reason'] = reason
-        await query.edit_message_text(f"Выбрана причина: {reason}. Генерирую справку...")
-        pdf_file = generate_pdf(user_data[user_id])
-        await query.message.reply_document(document=pdf_file, filename="spravka.pdf")
-        
-        # --- ОТПРАВКА ДАННЫХ В N8N ПОСЛЕ ГЕНЕРАЦИИ PDF ---
-        webhook_url = "https://primary-production-cee36.up.railway.app/webhook/python-telegram-bot" # <-- ЗАМЕНИТЕ НА ВАШ РЕАЛЬНЫЙ URL из n8n
-        payload = {
-            "user_id": user_id,
-            "username": query.from_user.username,
-            "full_name": query.from_user.full_name,
-            "fio": user_data[user_id]['fio'],
-            "dob": user_data[user_id]['dob'],
-            "dates": user_data[user_id]['dates'],
-            "reason": user_data[user_id]['reason'],
-            "timestamp": query.message.date.isoformat() if query.message.date else ""
-        }
-        try:
-            response = requests.post(webhook_url, json=payload, timeout=5)
-            if response.status_code != 200:
-                logger.warning(f"Не удалось отправить данные в n8n: {response.status_code}")
-        except Exception as e:
-            logger.warning(f"Ошибка отправки в n8n: {e}")
-        # ----------------------------------------------
-
-        del user_data[user_id]
-    elif query.data == 'back_fio':
-        user_data[user_id]['step'] = 'fio'
-        await query.edit_message_text("Введите ФИО:")
-    elif query.data == 'back_dob':
-        user_data[user_id]['step'] = 'dob'
-        await query.edit_message_text("Введите дату рождения (ДД.ММ.ГГГГ):")
-    elif query.data == 'back_dates':
-        user_data[user_id]['step'] = 'dates'
-        await query.edit_message_text("Укажите даты отсутствия (например, 01.11.2025 - 03.11.2025):")
-
 
 def main():
     app = Application.builder().token(TOKEN).build()
@@ -261,9 +250,8 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     logger.info("✅ Бот запущен и готов к работе...")
-    app.run_polling() # <-- ИСПОЛЬЗУЕТСЯ POLLING
+    app.run_polling()  # <-- ИСПОЛЬЗУЕТСЯ POLLING
+
 
 if __name__ == '__main__':
     main()
-
-
