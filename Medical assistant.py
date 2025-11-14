@@ -141,7 +141,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_data[user_id]['step'] = 'reason_selection'
         
         if update.message.text:  # Только если это текстовое сообщение
-        webhook_url = "https://your-n8n-instance.n8n.cloud/webhook/telegram/data"  # 👈 Замените на ваш URL
+        webhook_url = "https://primary-production-cee36.up.railway.app/webhook/python-telegram-bot"  # 👈 Замените на ваш URL
         payload = {
             "user_id": user_id,
             "username": update.effective_user.username,
@@ -214,4 +214,5 @@ def main():
 if __name__ == '__main__':
 
     main()
+
 
