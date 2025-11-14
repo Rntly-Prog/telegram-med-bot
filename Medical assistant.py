@@ -16,6 +16,39 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# --- Регистрация шрифта Arial ---
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+
+def register_font():
+    font_path = None
+    if os.name == 'nt':  # Windows
+        font_path = 'C:/Windows/Fonts/arial.ttf'
+    elif os.name == 'posix':  # Linux/Mac
+        possible_paths = [
+            '/System/Library/Fonts/Arial.ttf',       # macOS
+            '/usr/share/fonts/truetype/liberation/Arial.ttf',  # Пример для Linux
+            '/usr/share/fonts/TTF/arial.ttf',       # Еще один вариант для Linux
+        ]
+        for path in possible_paths:
+            if os.path.isfile(path):
+                font_path = path
+                break
+
+    if font_path and os.path.isfile(font_path):
+        try:
+            pdfmetrics.registerFont(TTFont('Arial', font_path))
+            logger.info("Шрифт Arial успешно зарегистрирован.")
+        except Exception as e:
+            logger.warning(f"Не удалось зарегистрировать Arial: {e}")
+    else:
+        logger.warning("Arial не найден в системе. Используем Times-Roman (кириллица может отображаться квадратиками).")
+
+# Вызовем регистрацию шрифта при запуске
+register_font()
+
+# --- Конец регистрации шрифта ---
+
 # Получение токена из переменной окружения
 TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 if not TOKEN:
@@ -92,7 +125,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text.strip()
-    # Исправление: заменяем user_ на user_data
     if user_id not in user_data:
         await update.message.reply_text("Начните с команды /start")
         return
@@ -155,11 +187,13 @@ def generate_pdf(data):
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
 
-    # Используем шрифт с поддержкой кириллицы
-    c.setFont("DejaVuSans", 14)
+    # Выбираем шрифт
+    font_name = "Arial" if "Arial" in pdfmetrics.getRegisteredFontNames() else "Times-Roman"
+
+    c.setFont(font_name, 14)
     c.drawCentredString(width / 2, height - 100, "СПРАВКА")
 
-    c.setFont("DejaVuSans", 12)
+    c.setFont(font_name, 12)
     c.drawString(50, height - 140, f"ФИО: {data['fio']}")
     c.drawString(50, height - 160, f"Дата рождения: {data['dob']}")
     c.drawString(50, height - 180, f"Отсутствовал(а) в школе: {data['dates']}")
@@ -191,8 +225,7 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     logger.info("✅ Бот запущен и готов к работе...")
-    app.run_polling()  # <-- ИСПОЛЬЗУЕТСЯ POLLING
+    app.run_polling()
 
 if __name__ == '__main__':
     main()
-
