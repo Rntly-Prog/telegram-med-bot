@@ -1,1 +1,1 @@
-worker: python Medical\ assistant.py
+worker: python "Medical assistant.py"
