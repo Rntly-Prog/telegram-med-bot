@@ -1,5 +1,6 @@
 import io
 import logging
+import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 from reportlab.lib.pagesizes import A4
@@ -20,8 +21,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Токен бота
-TOKEN = "8335522914:AAFSl1FgvhDsiO8Dku4NNwA70gEbIjB3T1A"
+TOKEN = os.getenv('TOKEN')
+if not TOKEN:
+    raise ValueError("Необходимо указать токен бота в переменной окружения TOKEN")
 
 # Возможные причины
 REASONS = [
@@ -195,4 +197,5 @@ def main():
     app.run_polling()
 
 if __name__ == '__main__':
+
     main()
