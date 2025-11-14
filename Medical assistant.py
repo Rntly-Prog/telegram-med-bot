@@ -144,7 +144,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_data[user_id]['step'] = 'reason_selection'
 
     if update.message.text:  # Только если это текстовое сообщение
-         webhook_url = "https://your-n8n-instance.n8n.cloud/webhook/webhook-bot-data" # <-- ЗАМЕНИТЕ НА ВАШ РЕАЛЬНЫЙ URL из n8n
+         webhook_url = "https://primary-production-cee36.up.railway.app/webhook/python-telegram-bot" # <-- ЗАМЕНИТЕ НА ВАШ РЕАЛЬНЫЙ URL из n8n
          payload = {
              "user_id": user_id,
              "username": update.effective_user.username,
@@ -220,7 +220,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_document(document=pdf_file, filename="spravka.pdf")
         
         # --- ОТПРАВКА ДАННЫХ В N8N ПОСЛЕ ГЕНЕРАЦИИ PDF ---
-        webhook_url = "https://your-n8n-instance.n8n.cloud/webhook/webhook-bot-data" # <-- ЗАМЕНИТЕ НА ВАШ РЕАЛЬНЫЙ URL из n8n
+        webhook_url = "https://primary-production-cee36.up.railway.app/webhook/python-telegram-bot" # <-- ЗАМЕНИТЕ НА ВАШ РЕАЛЬНЫЙ URL из n8n
         payload = {
             "user_id": user_id,
             "username": query.from_user.username,
@@ -265,3 +265,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
