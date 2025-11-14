@@ -1,11 +1,6 @@
 import io
 import logging
 import os
-from dotenv import load_dotenv  # <-- Добавьте эту строку
-
-# Загружаем переменные окружения из .env файла
-load_dotenv()  # <-- Добавьте эту строку
-
 # --- Добавьте этот импорт ---
 import requests  # Необходим для отправки HTTP-запросов в n8n
 # -------------------------
@@ -46,13 +41,11 @@ REASONS = [
 # Хранилище данных пользователей
 user_data = {}
 
-
 # --- Команда /start ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("📝 Начать создание справки", callback_data='create_doc')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("Привет! Я помогу тебе создать справку для школы.", reply_markup=reply_markup)
-
 
 # --- Команда /help ---
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -67,7 +60,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(help_text, parse_mode='Markdown')
 
-
 # --- Команда /cancel ---
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -76,7 +68,6 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Процесс отменён.", reply_markup=ReplyKeyboardRemove())
     else:
         await update.message.reply_text("У вас нет активного процесса.")
-
 
 # --- Обработчик кнопок ---
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -125,7 +116,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == 'back_dates':
         user_data[user_id]['step'] = 'dates'
         await query.edit_message_text("Укажите даты отсутствия (например, 01.11.2025 - 03.11.2025):")
-
 
 # --- Обработчик текстовых сообщений ---
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -193,21 +183,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             logger.warning(f"Ошибка отправки в n8n: {e}")
 
-
 def is_valid_name(name):
     return bool(re.match(r"^[A-Za-zА-Яа-яЁё\s\-']+$", name))
 
-
 def is_valid_date(date_str):
     return bool(re.match(r"^\d{2}\.\d{2}\.\d{4}$", date_str))
-
 
 def is_valid_date_range(range_str):
     parts = range_str.split(" - ")
     if len(parts) != 2:
         return False
     return all(is_valid_date(p) for p in parts)
-
 
 def generate_pdf(data):
     buffer = io.BytesIO()
@@ -239,7 +225,6 @@ def generate_pdf(data):
     buffer.seek(0)
     return buffer
 
-
 def main():
     app = Application.builder().token(TOKEN).build()
 
@@ -251,7 +236,6 @@ def main():
 
     logger.info("✅ Бот запущен и готов к работе...")
     app.run_polling()  # <-- ИСПОЛЬЗУЕТСЯ POLLING
-
 
 if __name__ == '__main__':
     main()
