@@ -1,6 +1,9 @@
 import io
 import logging
 import os
+# --- Добавьте этот импорт ---
+import requests # Необходим для отправки HTTP-запросов в n8n
+# -------------------------
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 from reportlab.lib.pagesizes import A4
@@ -139,23 +142,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text("Выберите причину отсутствия:", reply_markup=reply_markup)
         user_data[user_id]['step'] = 'reason_selection'
-        
-        if update.message.text:  # Только если это текстовое сообщение
-        webhook_url = "https://primary-production-cee36.up.railway.app/webhook/python-telegram-bot"  # 👈 Замените на ваш URL
-        payload = {
-            "user_id": user_id,
-            "username": update.effective_user.username,
-            "full_name": update.effective_user.full_name,
-            "message": text,
-            "step": step,
-            "timestamp": update.message.date.isoformat() if update.message.date else ""
-        }
-        try:
-            response = requests.post(webhook_url, json=payload, timeout=5)
-            if response.status_code != 200:
-                logger.warning(f"Не удалось отправить данные в n8n: {response.status_code}")
-        except Exception as e:
-            logger.warning(f"Ошибка отправки в n8n: {e}")
+
+    if update.message.text:  # Только если это текстовое сообщение
+         webhook_url = "https://your-n8n-instance.n8n.cloud/webhook/webhook-bot-data" # <-- ЗАМЕНИТЕ НА ВАШ РЕАЛЬНЫЙ URL из n8n
+         payload = {
+             "user_id": user_id,
+             "username": update.effective_user.username,
+             "full_name": update.effective_user.full_name,
+             "message": text,
+             "step": step,
+             "timestamp": update.message.date.isoformat() if update.message.date else ""
+         }
+         try:
+             response = requests.post(webhook_url, json=payload, timeout=5)
+             if response.status_code != 200:
+                 logger.warning(f"Не удалось отправить данные в n8n: {response.status_code}")
+         except Exception as e:
+             logger.warning(f"Ошибка отправки в n8n: {e}")
 
 def is_valid_name(name):
     return bool(re.match(r"^[A-Za-zА-Яа-яЁё\s\-']+$", name))
@@ -199,20 +202,66 @@ def generate_pdf(data):
     buffer.seek(0)
     return buffer
 
+# --- ИЗМЕНЁННЫЙ button_handler для отправки данных в n8n ПОСЛЕ генерации PDF ---
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    user_id = query.from_user.id
+
+    if query.data == 'create_doc':
+        user_data[user_id] = {'step': 'fio'}
+        await query.edit_message_text("Введите ФИО:")
+    elif query.data.startswith('reason_'):
+        reason = query.data.replace('reason_', '')
+        user_data[user_id]['reason'] = reason
+        await query.edit_message_text(f"Выбрана причина: {reason}. Генерирую справку...")
+        pdf_file = generate_pdf(user_data[user_id])
+        await query.message.reply_document(document=pdf_file, filename="spravka.pdf")
+        
+        # --- ОТПРАВКА ДАННЫХ В N8N ПОСЛЕ ГЕНЕРАЦИИ PDF ---
+        webhook_url = "https://your-n8n-instance.n8n.cloud/webhook/webhook-bot-data" # <-- ЗАМЕНИТЕ НА ВАШ РЕАЛЬНЫЙ URL из n8n
+        payload = {
+            "user_id": user_id,
+            "username": query.from_user.username,
+            "full_name": query.from_user.full_name,
+            "fio": user_data[user_id]['fio'],
+            "dob": user_data[user_id]['dob'],
+            "dates": user_data[user_id]['dates'],
+            "reason": user_data[user_id]['reason'],
+            "timestamp": query.message.date.isoformat() if query.message.date else ""
+        }
+        try:
+            response = requests.post(webhook_url, json=payload, timeout=5)
+            if response.status_code != 200:
+                logger.warning(f"Не удалось отправить данные в n8n: {response.status_code}")
+        except Exception as e:
+            logger.warning(f"Ошибка отправки в n8n: {e}")
+        # ----------------------------------------------
+
+        del user_data[user_id]
+    elif query.data == 'back_fio':
+        user_data[user_id]['step'] = 'fio'
+        await query.edit_message_text("Введите ФИО:")
+    elif query.data == 'back_dob':
+        user_data[user_id]['step'] = 'dob'
+        await query.edit_message_text("Введите дату рождения (ДД.ММ.ГГГГ):")
+    elif query.data == 'back_dates':
+        user_data[user_id]['step'] = 'dates'
+        await query.edit_message_text("Укажите даты отсутствия (например, 01.11.2025 - 03.11.2025):")
+
+
 def main():
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("cancel", cancel))
-    app.add_handler(CallbackQueryHandler(button_handler))
+    app.add_handler(CallbackQueryHandler(button_handler)) # Обновляем handler для кнопок
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     logger.info("✅ Бот запущен и готов к работе...")
     app.run_polling()
 
 if __name__ == '__main__':
-
     main()
-
-
