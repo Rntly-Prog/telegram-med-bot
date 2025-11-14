@@ -1,9 +1,6 @@
 import io
 import logging
 import os
-# --- Добавьте этот импорт ---
-import requests  # Необходим для отправки HTTP-запросов в n8n
-# -------------------------
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 from reportlab.lib.pagesizes import A4
@@ -14,8 +11,16 @@ import re
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
-# Регистрация шрифта Times New Roman
-pdfmetrics.registerFont(TTFont('TimesNewRoman', 'times.ttf'))
+# Регистрация стандартного шрифта Times New Roman (если доступен) или использование встроенного
+try:
+    # Попытка использовать Times New Roman (если установлен)
+    pdfmetrics.registerFont(TTFont('TimesNewRoman', 'times.ttf'))
+except:
+    # Если не удается, используем встроенный шрифт
+    from reportlab.pdfbase.pdfmetrics import registerFontFamily
+    from reportlab.lib.fonts import addMapping
+    # Используем встроенный шрифт Times-Roman
+    pass
 
 # Настройка логирования
 logging.basicConfig(
@@ -85,27 +90,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(f"Выбрана причина: {reason}. Генерирую справку...")
         pdf_file = generate_pdf(user_data[user_id])
         await query.message.reply_document(document=pdf_file, filename="spravka.pdf")
-
-        # --- ОТПРАВКА ДАННЫХ В N8N ПОСЛЕ ГЕНЕРАЦИИ PDF ---
-        webhook_url = "https://primary-production-cee36.up.railway.app/webhook/python-telegram-bot"  # <-- ЗАМЕНИТЕ НА ВАШ РЕАЛЬНЫЙ URL из n8n
-        payload = {
-            "user_id": user_id,
-            "username": query.from_user.username,
-            "full_name": query.from_user.full_name,
-            "fio": user_data[user_id]['fio'],
-            "dob": user_data[user_id]['dob'],
-            "dates": user_data[user_id]['dates'],
-            "reason": user_data[user_id]['reason'],
-            "timestamp": query.message.date.isoformat() if query.message.date else ""
-        }
-        try:
-            response = requests.post(webhook_url, json=payload, timeout=5)
-            if response.status_code != 200:
-                logger.warning(f"Не удалось отправить данные в n8n: {response.status_code}")
-        except Exception as e:
-            logger.warning(f"Ошибка отправки в n8n: {e}")
-        # ----------------------------------------------
-
         del user_data[user_id]
     elif query.data == 'back_fio':
         user_data[user_id]['step'] = 'fio'
@@ -121,7 +105,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text.strip()
-    if user_id not in user_data:
+    if user_id not in user_
         await update.message.reply_text("Начните с команды /start")
         return
     step = user_data[user_id].get('step')
@@ -166,23 +150,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Выберите причину отсутствия:", reply_markup=reply_markup)
         user_data[user_id]['step'] = 'reason_selection'
 
-    if update.message.text:  # Только если это текстовое сообщение
-        webhook_url = "https://primary-production-cee36.up.railway.app/webhook/python-telegram-bot"  # <-- ЗАМЕНИТЕ НА ВАШ РЕАЛЬНЫЙ URL из n8n
-        payload = {
-            "user_id": user_id,
-            "username": update.effective_user.username,
-            "full_name": update.effective_user.full_name,
-            "message": text,
-            "step": step,
-            "timestamp": update.message.date.isoformat() if update.message.date else ""
-        }
-        try:
-            response = requests.post(webhook_url, json=payload, timeout=5)
-            if response.status_code != 200:
-                logger.warning(f"Не удалось отправить данные в n8n: {response.status_code}")
-        except Exception as e:
-            logger.warning(f"Ошибка отправки в n8n: {e}")
-
 def is_valid_name(name):
     return bool(re.match(r"^[A-Za-zА-Яа-яЁё\s\-']+$", name))
 
@@ -200,10 +167,11 @@ def generate_pdf(data):
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
 
-    c.setFont("TimesNewRoman", 14)
+    # Используем встроенный шрифт Times-Roman вместо Times New Roman
+    c.setFont("Times-Roman", 14)
     c.drawCentredString(width / 2, height - 100, "СПРАВКА")
 
-    c.setFont("TimesNewRoman", 12)
+    c.setFont("Times-Roman", 12)
     c.drawString(50, height - 140, f"ФИО: {data['fio']}")
     c.drawString(50, height - 160, f"Дата рождения: {data['dob']}")
     c.drawString(50, height - 180, f"Отсутствовал(а) в школе: {data['dates']}")
