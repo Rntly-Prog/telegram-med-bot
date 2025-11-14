@@ -8,19 +8,6 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
 from PIL import Image
 import re
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-
-# Регистрация стандартного шрифта Times New Roman (если доступен) или использование встроенного
-try:
-    # Попытка использовать Times New Roman (если установлен)
-    pdfmetrics.registerFont(TTFont('TimesNewRoman', 'times.ttf'))
-except:
-    # Если не удается, используем встроенный шрифт
-    from reportlab.pdfbase.pdfmetrics import registerFontFamily
-    from reportlab.lib.fonts import addMapping
-    # Используем встроенный шрифт Times-Roman
-    pass
 
 # Настройка логирования
 logging.basicConfig(
@@ -105,7 +92,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text.strip()
-    if user_id not in user_data:
+    if user_id not in user_
         await update.message.reply_text("Начните с команды /start")
         return
     step = user_data[user_id].get('step')
@@ -167,7 +154,7 @@ def generate_pdf(data):
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
 
-    # Используем встроенный шрифт Times-Roman вместо Times New Roman
+    # Используем встроенный шрифт Times-Roman (аналог Times New Roman)
     c.setFont("Times-Roman", 14)
     c.drawCentredString(width / 2, height - 100, "СПРАВКА")
 
